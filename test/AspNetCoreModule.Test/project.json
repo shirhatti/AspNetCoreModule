@@ -3,9 +3,7 @@
     "warningsAsErrors": true,
     "copyToOutput": {
       "include": [
-        "Http.config",
-        "nginx.conf",
-        "NtlmAuthentication.config"
+        "Http.config"
       ]
     }
   },
@@ -22,7 +20,12 @@
   "frameworks": {
     "net451": {
       "frameworkAssemblies": {
-        "System.IO.Compression.FileSystem": ""
+        "System.IO.Compression.FileSystem": "",
+        "System.Data": "",
+        "System.Net.Http": "",
+        "System.Net.Http.WebRequest": "",
+        "System.Runtime": "",
+        "System.Xml": ""
       }
     }
   }  

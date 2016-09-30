@@ -18,17 +18,26 @@ namespace AspNetCoreModule.FunctionalTests
     // Uses ports ranging 5080 - 5099.
     public class ResponseTests : IClassFixture<UseLatestAncm>
     {
-        //[ConditionalTheory]
-        //[OSSkipCondition(OperatingSystems.Linux)]
-        //[OSSkipCondition(OperatingSystems.MacOSX)]
-        //[InlineData(ServerType.IISExpress, RuntimeFlavor.Clr, RuntimeArchitecture.x64, "http://localhost:5090/", ApplicationType.Portable)]
-        //[InlineData(ServerType.IISExpress, RuntimeFlavor.Clr, RuntimeArchitecture.x64, "http://localhost:5091/", ApplicationType.Portable)]
-        ////[InlineData(ServerType.IISExpress, RuntimeFlavor.Clr, RuntimeArchitecture.x86, "http://localhost:5090/", ApplicationType.Portable)]
+        [ConditionalTheory]
+        [OSSkipCondition(OperatingSystems.Linux)]
+        [OSSkipCondition(OperatingSystems.MacOSX)]
+        [InlineData(ServerType.IISExpress, RuntimeFlavor.Clr, RuntimeArchitecture.x64, "http://localhost:5090/", ApplicationType.Portable)]
+        //[InlineData(ServerType.IISExpress, RuntimeFlavor.Clr, RuntimeArchitecture.x86, "http://localhost:5090/", ApplicationType.Portable)] 
         public Task BasicTest(ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, ApplicationType applicationType)
         {
             return ResponseFormats(serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, applicationType);
         }
 
+        [ConditionalTheory]
+        [SkipIfEnvironmentVariableNotEnabled("IIS_VARIATIONS_ENABLED")]
+        [OSSkipCondition(OperatingSystems.Linux)]
+        [OSSkipCondition(OperatingSystems.MacOSX)]
+        [InlineData(ServerType.IIS, RuntimeFlavor.Clr, RuntimeArchitecture.x64, "http://localhost/", ApplicationType.Portable)]
+        public Task BasicTestForIIS(ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, ApplicationType applicationType)
+        {
+            return ResponseFormats(serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, applicationType);
+        }
+        
         public async Task ResponseFormats(ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, Func<HttpClient, ILogger, Task> scenario, ApplicationType applicationType)
         {
             var logger = new LoggerFactory()
@@ -41,7 +50,7 @@ namespace AspNetCoreModule.FunctionalTests
                 {
                     ApplicationBaseUriHint = applicationBaseUrl,
                     EnvironmentName = "Responses",
-                    ServerConfigTemplateContent = Helpers.GetConfigContent(serverType, "Http.config", "nginx.conf"),
+                    ServerConfigTemplateContent = Helpers.GetConfigContent(serverType, "Http.config"),
                     SiteName = "HttpTestSite", // This is configured in the Http.config
                     TargetFramework = runtimeFlavor == RuntimeFlavor.Clr ? "net451" : "netcoreapp1.0",
                     ApplicationType = applicationType

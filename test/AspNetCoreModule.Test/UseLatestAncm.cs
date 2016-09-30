@@ -23,12 +23,12 @@ namespace AspNetCoreModule.FunctionalTests
         private void InvokeInstallScript()
         {
             var solutionRoot = GetSolutionDirectory();
-            string outputPath = Path.Combine(_extractDirectory, "artifacts", "ancm", "Debug");
+            string outputPath = Path.Combine(_extractDirectory, "ancm", "Debug");
             //string outputPath = Path.Combine(solutionRoot, "artifacts", "build", "AspNetCore", "bin", "Debug");
             Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"/c {_extractDirectory}/ancm/installancm.ps1 " + outputPath
+                Arguments = $"\"{_extractDirectory}/installancm.ps1\" \"" + outputPath + "\""
             }).WaitForExit();
         }
 
@@ -60,7 +60,7 @@ namespace AspNetCoreModule.FunctionalTests
             
             if (nupkg == null)
             {
-                throw new Exception("Cannot find Ancm package");
+                throw new Exception("Cannot find the ANCM nuget package, which is expected to be under artifacts\build");
             }
 
             return nupkg;
@@ -76,8 +76,16 @@ namespace AspNetCoreModule.FunctionalTests
             Process.Start(new ProcessStartInfo
             {
                 FileName = "powershell.exe",
-                Arguments = $"/c {_extractDirectory}/installancm.ps1 -Rollback",
+                Arguments = $"\"{_extractDirectory}/installancm.ps1\" -Rollback",
             }).WaitForExit();
+            try
+            {
+                Directory.Delete(_extractDirectory);
+            }
+            catch
+            {
+                // ignore exception which happens while deleting the temporary directory which won'be used anymore
+            }
         }
     }
 }

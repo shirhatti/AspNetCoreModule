@@ -31,18 +31,13 @@ namespace AspNetCoreModule.FunctionalTests
             throw new Exception($"Solution root could not be found using {applicationBasePath}");
         }
 
-        public static string GetConfigContent(ServerType serverType, string iisConfig, string nginxConfig)
+        public static string GetConfigContent(ServerType serverType, string iisConfig)
         {
             string content = null;
             if (serverType == ServerType.IISExpress)
             {
                 content = File.ReadAllText(iisConfig);
             }
-            else if (serverType == ServerType.Nginx)
-            {
-                content = File.ReadAllText(nginxConfig);
-            }
-
             return content;
         }
     }
