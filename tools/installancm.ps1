@@ -397,10 +397,10 @@ if ($Extract)
 
 # clean up IIS and IISExpress worker processes and IIS services
 Say ("$LogHeader Stopping w3wp.exe process")
-Stop-Process -Name w3wp -ErrorAction Ignore
+Stop-Process -Name w3wp -ErrorAction Ignore -Force -Confirm:$false
 
 Say ("$LogHeader Stopping iisexpress.exe process")
-Stop-Process -Name iisexpress -ErrorAction Ignore
+Stop-Process -Name iisexpress -ErrorAction Ignore -Force -Confirm:$false
 
 $w3svcGotStopped = $false
 $w3svcWindowsServce = Get-Service W3SVC -ErrorAction Ignore
