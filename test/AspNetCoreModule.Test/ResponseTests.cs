@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using Xunit;
 using Xunit.Sdk;
+using System.IO;
 
 namespace AspNetCoreModule.FunctionalTests
 {
@@ -46,21 +47,27 @@ namespace AspNetCoreModule.FunctionalTests
 
             using (logger.BeginScope("ResponseFormatsTest"))
             {
-                var deploymentParameters = new DeploymentParameters(Helpers.GetApplicationPath(applicationType), serverType, runtimeFlavor, architecture)
+                string applicationPath = Helpers.GetApplicationPath(applicationType);
+                var deploymentParameters = new DeploymentParameters(applicationPath, serverType, runtimeFlavor, architecture)
                 {
                     ApplicationBaseUriHint = applicationBaseUrl,
+                    
                     EnvironmentName = "Responses",
                     ServerConfigTemplateContent = Helpers.GetConfigContent(serverType, "Http.config"),
                     SiteName = "HttpTestSite", // This is configured in the Http.config
                     TargetFramework = runtimeFlavor == RuntimeFlavor.Clr ? "net451" : "netcoreapp1.0",
                     ApplicationType = applicationType
                 };
-
+                
                 using (var deployer = ApplicationDeployerFactory.Create(deploymentParameters, logger))
                 {
                     var deploymentResult = deployer.Deploy();
                     var httpClientHandler = new HttpClientHandler();
-                    var httpClient = new HttpClient(httpClientHandler) { BaseAddress = new Uri(deploymentResult.ApplicationBaseUri) };
+                    var httpClient = new HttpClient(httpClientHandler)
+                    {
+                        BaseAddress = new Uri(deploymentResult.ApplicationBaseUri),
+                        Timeout = TimeSpan.FromSeconds(5),
+                    };
 
                     // Request to base address and check if various parts of the body are rendered & measure the cold startup time.
                     var response = await RetryHelper.RetryRequest(() =>

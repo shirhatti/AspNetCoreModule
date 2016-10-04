@@ -13,22 +13,18 @@ namespace AspNetCoreModule.FunctionalTests
         public static string GetApplicationPath(ApplicationType applicationType)
         {
             var applicationBasePath = PlatformServices.Default.Application.ApplicationBasePath;
-
-            var directoryInfo = new DirectoryInfo(applicationBasePath);
-            do
+            string solutionPath = UseLatestAncm.GetSolutionDirectory();
+            string applicationPath = string.Empty;
+            if (applicationType == ApplicationType.Standalone)
             {
-                var solutionFileInfo = new FileInfo(Path.Combine(directoryInfo.FullName, "AspNetCoreModule.sln"));
-                if (solutionFileInfo.Exists)
-                {
-                    var projectName = applicationType == ApplicationType.Standalone ? "AspNetCoreModule.TestSites" : "AspNetCoreModule.TestSites";
-                    return Path.GetFullPath(Path.Combine(directoryInfo.FullName, "test", projectName));
-                }
-
-                directoryInfo = directoryInfo.Parent;
+                applicationPath = Path.Combine(solutionPath, "test", "TestSites", "bin", "Debug", "netcoreapp1.0", "win7 - x64", "publish");
             }
-            while (directoryInfo.Parent != null);
-
-            throw new Exception($"Solution root could not be found using {applicationBasePath}");
+            else
+            {
+                //applicationPath = Path.Combine(solutionPath, "test", "AspNetCoreModule.TestSites", "bin", "Debug", "netcoreapp1.0", "publish");
+                applicationPath = Path.Combine(solutionPath, "test", "AspNetCoreModule.TestSites");
+            }
+            return applicationPath;
         }
 
         public static string GetConfigContent(ServerType serverType, string iisConfig)

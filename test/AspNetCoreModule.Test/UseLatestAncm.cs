@@ -11,7 +11,9 @@ namespace AspNetCoreModule.FunctionalTests
     {
         private readonly string _extractDirectory = null;
         
-
+        // Set this flag true if the nuget package contains out-dated aspnetcore.dll and you want to use the solution output path instead to apply the laetst ANCM files
+        public static bool UseSolutionOutputFiles = true; 
+        
         public UseLatestAncm()
         {
             string aspnetCoreModulePackagePath = GetLatestAncmPackage();
@@ -23,13 +25,34 @@ namespace AspNetCoreModule.FunctionalTests
         private void InvokeInstallScript()
         {
             var solutionRoot = GetSolutionDirectory();
-            string outputPath = Path.Combine(_extractDirectory, "ancm", "Debug");
-            //string outputPath = Path.Combine(solutionRoot, "artifacts", "build", "AspNetCore", "bin", "Debug");
-            Process.Start(new ProcessStartInfo
+            string outputPath = string.Empty;
+            string setupScriptPath = string.Empty;
+
+            if (UseSolutionOutputFiles)
             {
-                FileName = "powershell.exe",
-                Arguments = $"\"{_extractDirectory}/installancm.ps1\" \"" + outputPath + "\""
-            }).WaitForExit();
+                setupScriptPath = _extractDirectory;
+                outputPath = Path.Combine(solutionRoot, "artifacts", "build", "AspNetCore", "bin", "Debug");
+            }
+            else
+            {
+                setupScriptPath = Path.Combine(solutionRoot, "tools");
+                outputPath = Path.Combine(_extractDirectory, "ancm", "Debug");
+            }
+
+            Process p = new Process();
+            p.StartInfo.FileName = "powershell.exe";
+            p.StartInfo.Arguments = $"\"{setupScriptPath}\\installancm.ps1\" \"" + outputPath + "\"";
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
+            p.StartInfo.UseShellExecute = false;
+            p.Start();
+            string standardOutput = p.StandardOutput.ReadToEnd();
+            string standardError = p.StandardError.ReadToEnd();
+            p.WaitForExit();
+            if (standardError != string.Empty)
+            {
+                throw new Exception("Failed to update ANCM files, StandardError: " + standardError + ", StandardOutput: " + standardOutput);
+            }
         }
 
         public static string GetSolutionDirectory()
@@ -50,8 +73,7 @@ namespace AspNetCoreModule.FunctionalTests
 
             throw new Exception($"Solution root could not be located using application root {applicationBasePath}.");
         }
-
-
+        
         private static string GetLatestAncmPackage()
         {
             var solutionRoot = GetSolutionDirectory();
@@ -68,16 +90,25 @@ namespace AspNetCoreModule.FunctionalTests
 
         public void Dispose()
         {
-            InvokeUninstallScript();
+            InvokeRollbackScript();
         }
 
-        private void InvokeUninstallScript()
+        private void InvokeRollbackScript()
         {
-            Process.Start(new ProcessStartInfo
+            Process p = new Process();
+            p.StartInfo.FileName = "powershell.exe";
+            p.StartInfo.Arguments = $"\"{_extractDirectory}\\installancm.ps1\" -Rollback";
+            p.StartInfo.RedirectStandardOutput = true;
+            p.StartInfo.RedirectStandardError = true;
+            p.StartInfo.UseShellExecute = false;
+            p.Start();
+            string standardOutput = p.StandardOutput.ReadToEnd();
+            string standardError = p.StandardError.ReadToEnd();
+            p.WaitForExit();
+            if (standardError != string.Empty)
             {
-                FileName = "powershell.exe",
-                Arguments = $"\"{_extractDirectory}/installancm.ps1\" -Rollback",
-            }).WaitForExit();
+                throw new Exception("Failed to restore ANCM files, StandardError: " + standardError + ", StandardOutput: " + standardOutput);
+            }
             try
             {
                 Directory.Delete(_extractDirectory);
