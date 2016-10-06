@@ -8,7 +8,7 @@ using Microsoft.Net.Http.Headers;
 
 namespace AspnetCoreModule.TestSites
 {
-    public class StartupResponses
+    public class StartupResponse
     {
         public void Configure(IApplicationBuilder app, ILoggerFactory loggerFactory)
         {

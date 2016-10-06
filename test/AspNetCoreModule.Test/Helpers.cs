@@ -17,13 +17,13 @@ namespace AspNetCoreModule.FunctionalTests
             string applicationPath = string.Empty;
             if (applicationType == ApplicationType.Standalone)
             {
-                applicationPath = Path.Combine(solutionPath, "test", "TestSites", "bin", "Debug", "netcoreapp1.0", "win7 - x64", "publish");
+                applicationPath = Path.Combine(solutionPath, "test", "AspNetCoreModule.TestSites.Standalone");
             }
             else
             {
-                //applicationPath = Path.Combine(solutionPath, "test", "AspNetCoreModule.TestSites", "bin", "Debug", "netcoreapp1.0", "publish");
                 applicationPath = Path.Combine(solutionPath, "test", "AspNetCoreModule.TestSites");
             }
+            var projectName = applicationType == ApplicationType.Standalone ? "ServerComparison.TestSites.Standalone" : "ServerComparison.TestSites";
             return applicationPath;
         }
 

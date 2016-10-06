@@ -1,12 +1,12 @@
-// Copyright (c) .NET Foundation. All rights reserved.
+﻿// Copyright (c) .NET Foundation. All rights reserved.
 // Licensed under the Apache License, Version 2.0. See License.txt in the project root for license information.
 
+using System;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Net.Http.Server;
-using System;
 
-namespace AspnetCoreModule.TestSites
+namespace ServerComparison.TestSites.Standalone
 {
     public static class Program
     {
@@ -19,7 +19,7 @@ namespace AspnetCoreModule.TestSites
             var builder = new WebHostBuilder()
                 .UseConfiguration(config)
                 .UseIISIntegration()
-                .UseStartup<StartupResponse>();
+                .UseStartup("AspNetCoreModule.TestSites.Standalone");
 
             // Switch between Kestrel and WebListener for different tests. Default to Kestrel for normal app execution.
             if (string.Equals(builder.GetSetting("server"), "Microsoft.AspNetCore.Server.WebListener", System.StringComparison.Ordinal))
