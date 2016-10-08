@@ -5,8 +5,9 @@ using System;
 using System.IO;
 using Microsoft.AspNetCore.Server.IntegrationTesting;
 using Microsoft.Extensions.PlatformAbstractions;
+using AspNetCoreModule.FunctionalTests;
 
-namespace AspNetCoreModule.FunctionalTests
+namespace AspNetCoreModule.Test
 {
     public class Helpers
     {

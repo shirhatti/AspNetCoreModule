@@ -12,36 +12,41 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
 using Xunit;
 using Xunit.Sdk;
-using System.IO;
+using AspNetCoreModule.Test;
+using AspNetCoreModule.Test.Utility;
+using static AspNetCoreModule.Test.Utility.UseIISServer;
 
 namespace AspNetCoreModule.FunctionalTests
 {
-    // Uses ports ranging 5080 - 5099.
-    public class ResponseTests : IClassFixture<UseLatestAncm>
+    public class ResponseTests : IClassFixture<UseLatestAncm>, IClassFixture<UseIISServer>
     {
         [ConditionalTheory]
         [OSSkipCondition(OperatingSystems.Linux)]
         [OSSkipCondition(OperatingSystems.MacOSX)]
         [InlineData(ServerType.IISExpress, RuntimeFlavor.CoreClr, RuntimeArchitecture.x64, "http://localhost:5090/", ApplicationType.Portable)]
         [InlineData(ServerType.IISExpress, RuntimeFlavor.Clr, RuntimeArchitecture.x64, "http://localhost:5091/", ApplicationType.Portable)]
-        //[InlineData(ServerType.IISExpress, RuntimeFlavor.Clr, RuntimeArchitecture.x86, "http://localhost:5092/", ApplicationType.Portable)] 
         public Task BasicTest(ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, ApplicationType applicationType)
         {
-            return ResponseFormats(serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, applicationType);
+            return ResponseFormats(AppPoolSetting.none, serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, applicationType);
         }
 
         [ConditionalTheory]
         [SkipIfEnvironmentVariableNotEnabled("IIS_VARIATIONS_ENABLED")]
         [OSSkipCondition(OperatingSystems.Linux)]
         [OSSkipCondition(OperatingSystems.MacOSX)]
-        [InlineData(ServerType.IIS, RuntimeFlavor.CoreClr, RuntimeArchitecture.x64, "http://localhost:5093/", ApplicationType.Portable)]
-        public Task BasicTestForIIS(ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, ApplicationType applicationType)
+        [InlineData(AppPoolSetting.enable32BitAppOnWin64, ServerType.IIS, RuntimeFlavor.CoreClr, RuntimeArchitecture.x64, "http://localhost:5093/", ApplicationType.Portable)]
+        public Task BasicTestForIIS(AppPoolSetting appPoolSetting, ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, ApplicationType applicationType)
         {
-            return ResponseFormats(serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, applicationType);
+            return ResponseFormats(appPoolSetting, serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, applicationType);
         }
         
-        public async Task ResponseFormats(ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, Func<HttpClient, ILogger, Task> scenario, ApplicationType applicationType)
+        public async Task ResponseFormats(AppPoolSetting appPoolSetting, ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, Func<HttpClient, ILogger, Task> scenario, ApplicationType applicationType)
         {
+            if (serverType == ServerType.IIS)
+            {
+                
+            }
+
             var logger = new LoggerFactory()
                             .AddConsole()
                             .CreateLogger(string.Format("ResponseFormats:{0}:{1}:{2}:{3}", serverType, runtimeFlavor, architecture, applicationType));
@@ -52,7 +57,6 @@ namespace AspNetCoreModule.FunctionalTests
                 var deploymentParameters = new DeploymentParameters(applicationPath, serverType, runtimeFlavor, architecture)
                 {
                     ApplicationBaseUriHint = applicationBaseUrl,
-
                     EnvironmentName = "Response",
                     ServerConfigTemplateContent = Helpers.GetConfigContent(serverType, "Http.config"),
                     SiteName = "HttpTestSite", // This is configured in the Http.config
@@ -60,6 +64,11 @@ namespace AspNetCoreModule.FunctionalTests
                     ApplicationType = applicationType,
                     PublishApplicationBeforeDeployment = true
                 };
+
+                if (appPoolSetting == AppPoolSetting.enable32BitAppOnWin64)
+                {
+                    IIS.SetAppPoolSetting("DefaultAppPool", AppPoolSettings.enable32BitAppOnWin64, true);
+                }
 
                 using (var deployer = ApplicationDeployerFactory.Create(deploymentParameters, logger))
                 {

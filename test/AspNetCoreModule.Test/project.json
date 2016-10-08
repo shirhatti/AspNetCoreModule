@@ -25,7 +25,8 @@
         "System.Net.Http": "",
         "System.Net.Http.WebRequest": "",
         "System.Runtime": "",
-        "System.Xml": ""
+        "System.Xml": "",
+        "System.Management": "4.0.0.0"
       }
     }
   }  
