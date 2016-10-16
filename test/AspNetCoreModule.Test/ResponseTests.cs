@@ -14,61 +14,63 @@ using Xunit;
 using Xunit.Sdk;
 using AspNetCoreModule.Test;
 using AspNetCoreModule.Test.Utility;
-using static AspNetCoreModule.Test.Utility.UseIISServer;
+using static AspNetCoreModule.Test.Utility.IISConfigUtility;
 
 namespace AspNetCoreModule.FunctionalTests
 {
-    public class ResponseTests : IClassFixture<UseLatestAncm>, IClassFixture<UseIISServer>
+    public class ResponseTests : IClassFixture<UseLatestAncm>
     {
         [ConditionalTheory]
         [OSSkipCondition(OperatingSystems.Linux)]
         [OSSkipCondition(OperatingSystems.MacOSX)]
-        [InlineData(ServerType.IISExpress, RuntimeFlavor.CoreClr, RuntimeArchitecture.x64, "http://localhost:5090/", ApplicationType.Portable)]
-        [InlineData(ServerType.IISExpress, RuntimeFlavor.Clr, RuntimeArchitecture.x64, "http://localhost:5091/", ApplicationType.Portable)]
-        public Task BasicTest(ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, ApplicationType applicationType)
+        [InlineData(ServerType.IISExpress, RuntimeFlavor.CoreClr, RuntimeArchitecture.x64, "http://localhost:5090/")]
+        [InlineData(ServerType.IISExpress, RuntimeFlavor.Clr, RuntimeArchitecture.x64, "http://localhost:5091/")]
+        public Task BasicTest(ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl)
         {
-            return ResponseFormats(AppPoolSetting.none, serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, applicationType);
+            return ResponseFormats(AppPoolSettings.none, serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, ApplicationType.Portable);
+        }
+
+        private Task ResponseFormats(object none, ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, Func<HttpClient, ILogger, Task> checkChunkedAsync, ApplicationType portable)
+        {
+            throw new NotImplementedException();
         }
 
         [ConditionalTheory]
         [SkipIfEnvironmentVariableNotEnabled("IIS_VARIATIONS_ENABLED")]
         [OSSkipCondition(OperatingSystems.Linux)]
         [OSSkipCondition(OperatingSystems.MacOSX)]
-        [InlineData(AppPoolSetting.enable32BitAppOnWin64, ServerType.IIS, RuntimeFlavor.CoreClr, RuntimeArchitecture.x64, "http://localhost:5093/", ApplicationType.Portable)]
-        public Task BasicTestForIIS(AppPoolSetting appPoolSetting, ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, ApplicationType applicationType)
+        [InlineData(AppPoolSettings.enable32BitAppOnWin64, ServerType.IIS, RuntimeFlavor.CoreClr, RuntimeArchitecture.x64, "http://localhost:5093/")]
+        public Task BasicTestForIIS(AppPoolSettings appPoolSetting, ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl)
         {
-            return ResponseFormats(appPoolSetting, serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, applicationType);
+            return ResponseFormats(appPoolSetting, serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, ApplicationType.Portable);
         }
         
-        public async Task ResponseFormats(AppPoolSetting appPoolSetting, ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, Func<HttpClient, ILogger, Task> scenario, ApplicationType applicationType)
+        public async Task ResponseFormats(AppPoolSettings appPoolSetting, ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, Func<HttpClient, ILogger, Task> scenario, ApplicationType applicationType)
         {
-            if (serverType == ServerType.IIS)
-            {
-                
-            }
-
             var logger = new LoggerFactory()
                             .AddConsole()
                             .CreateLogger(string.Format("ResponseFormats:{0}:{1}:{2}:{3}", serverType, runtimeFlavor, architecture, applicationType));
 
             using (logger.BeginScope("ResponseFormatsTest"))
             {
+                var IISConfigUtility = new IISConfigUtility(serverType);
+                IISConfigUtility.SiteName = "HttpTestSite";
+                if (appPoolSetting == AppPoolSettings.enable32BitAppOnWin64)
+                {
+                    IISConfigUtility.SetAppPoolSetting(AppPoolSettings.enable32BitAppOnWin64, true);
+                }
+
                 string applicationPath = Helpers.GetApplicationPath(applicationType);
                 var deploymentParameters = new DeploymentParameters(applicationPath, serverType, runtimeFlavor, architecture)
                 {
                     ApplicationBaseUriHint = applicationBaseUrl,
                     EnvironmentName = "Response",
                     ServerConfigTemplateContent = Helpers.GetConfigContent(serverType, "Http.config"),
-                    SiteName = "HttpTestSite", // This is configured in the Http.config
+                    SiteName = IISConfigUtility.SiteName, // This is configured in the Http.config
                     TargetFramework = runtimeFlavor == RuntimeFlavor.Clr ? "net451" : "netcoreapp1.0",
                     ApplicationType = applicationType,
                     PublishApplicationBeforeDeployment = true
                 };
-
-                if (appPoolSetting == AppPoolSetting.enable32BitAppOnWin64)
-                {
-                    IIS.SetAppPoolSetting("DefaultAppPool", AppPoolSettings.enable32BitAppOnWin64, true);
-                }
 
                 using (var deployer = ApplicationDeployerFactory.Create(deploymentParameters, logger))
                 {

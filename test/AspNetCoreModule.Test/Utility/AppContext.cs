@@ -31,7 +31,6 @@ namespace AspNetCoreModule.Test.Utility
             }
 
             BackupFile("web.config");
-            UseIISServer.IIS.Applications.Add(this);
         }
 
         public void Dispose()

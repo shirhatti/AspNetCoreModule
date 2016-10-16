@@ -140,10 +140,10 @@ namespace AspNetCoreModule.Test.Utility
             return result;
         }
 
-        public static string GetHttpUri(string Url)
+        public static string GetHttpUri(string Url, IISConfigUtility config)
         {
             string tempUrl = Url.TrimStart(new char[] { '/' });
-            return "http://" + UseIISServer.IIS.ServerName + ":" + UseIISServer.IIS.TcpPort + "/" + tempUrl;
+            return "http://" + config.ServerName + ":" + config.TcpPort + "/" + tempUrl;
         }
 
         public static string XmlParser(string xmlFileContent, string elementName, string attributeName, string childkeyValue)
@@ -214,7 +214,7 @@ namespace AspNetCoreModule.Test.Utility
 
         public static void LogMessage(string message)
         {
-            TestOutputHelper.WriteLine(message);
+            //TestOutputHelper.WriteLine(message);
         }
 
         public static void LogFail(string message)
