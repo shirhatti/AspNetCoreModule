@@ -42,7 +42,7 @@ namespace AspNetCoreModule.FunctionalTests
         [InlineData(AppPoolSettings.enable32BitAppOnWin64, ServerType.IIS, RuntimeFlavor.CoreClr, RuntimeArchitecture.x64, "http://localhost:5093/")]
         public Task BasicTestForIIS(AppPoolSettings appPoolSetting, ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl)
         {
-            return ResponseFormats(appPoolSetting, serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChunkedAsync, ApplicationType.Portable);
+            return ResponseFormats(appPoolSetting, serverType, runtimeFlavor, architecture, applicationBaseUrl, CheckChangeNotificationAsync, ApplicationType.Portable);
         }
         
         public async Task ResponseFormats(AppPoolSettings appPoolSetting, ServerType serverType, RuntimeFlavor runtimeFlavor, RuntimeArchitecture architecture, string applicationBaseUrl, Func<HttpClient, ILogger, Task> scenario, ApplicationType applicationType)
@@ -51,34 +51,33 @@ namespace AspNetCoreModule.FunctionalTests
                             .AddConsole()
                             .CreateLogger(string.Format("ResponseFormats:{0}:{1}:{2}:{3}", serverType, runtimeFlavor, architecture, applicationType));
 
+            
             using (logger.BeginScope("ResponseFormatsTest"))
             {
-                var IISConfigUtility = new IISConfigUtility(serverType);
-                IISConfigUtility.SiteName = "HttpTestSite";
-                if (appPoolSetting == AppPoolSettings.enable32BitAppOnWin64)
-                {
-                    IISConfigUtility.SetAppPoolSetting(AppPoolSettings.enable32BitAppOnWin64, true);
-                }
-
                 string applicationPath = Helpers.GetApplicationPath(applicationType);
+                string testSiteName = "ANCMTestSite"; // This is configured in the Http.config
                 var deploymentParameters = new DeploymentParameters(applicationPath, serverType, runtimeFlavor, architecture)
                 {
                     ApplicationBaseUriHint = applicationBaseUrl,
                     EnvironmentName = "Response",
                     ServerConfigTemplateContent = Helpers.GetConfigContent(serverType, "Http.config"),
-                    SiteName = IISConfigUtility.SiteName, // This is configured in the Http.config
+                    SiteName = testSiteName, 
                     TargetFramework = runtimeFlavor == RuntimeFlavor.Clr ? "net451" : "netcoreapp1.0",
                     ApplicationType = applicationType,
                     PublishApplicationBeforeDeployment = true
                 };
 
+                string publishedApplicationRootPath = null;
                 using (var deployer = ApplicationDeployerFactory.Create(deploymentParameters, logger))
                 {
                     var deploymentResult = deployer.Deploy();
+                    publishedApplicationRootPath = deploymentParameters.PublishedApplicationRootPath;
+                    var applicationBaseAddress = new Uri(deploymentResult.ApplicationBaseUri);
+
                     var httpClientHandler = new HttpClientHandler();
                     var httpClient = new HttpClient(httpClientHandler)
                     {
-                        BaseAddress = new Uri(deploymentResult.ApplicationBaseUri),
+                        BaseAddress = applicationBaseAddress,
                         Timeout = TimeSpan.FromSeconds(5),
                     };
 
@@ -102,47 +101,35 @@ namespace AspNetCoreModule.FunctionalTests
 
                     await scenario(httpClient, logger);
                 }
+
+                if (serverType == ServerType.IIS)
+                {
+                    using (var iisConfig = new IISConfigUtility(serverType))
+                    {
+                        string standardSiteName = "ancmStandardTestSite";
+                        var testsiteContext = new SiteContext("localhost", standardSiteName, 1234);
+                        var rootAppContext = new AppContext("/", publishedApplicationRootPath, testsiteContext);
+                        iisConfig.CreateSite(testsiteContext.SiteName, rootAppContext.PhysicalPath, 555, testsiteContext.TcpPort, rootAppContext.AppPoolName);
+            
+                        if (appPoolSetting == AppPoolSettings.enable32BitAppOnWin64)
+                        {
+                            iisConfig.SetAppPoolSetting(rootAppContext.AppPoolName, AppPoolSettings.enable32BitAppOnWin64, true);
+                            iisConfig.RecycleAppPool(rootAppContext.AppPoolName);
+                        }
+                        
+                        var httpClientHandler = new HttpClientHandler();
+                        var httpClient = new HttpClient(httpClientHandler)
+                        {
+                            BaseAddress = rootAppContext.GetHttpUri(),
+                            Timeout = TimeSpan.FromSeconds(5),
+                        };
+
+                        await scenario(httpClient, logger);
+                    }
+                }
             }
         }
-
-        private static async Task CheckContentLengthAsync(HttpClient client, ILogger logger)
-        {
-            var response = await client.GetAsync("contentlength");
-            var responseText = await response.Content.ReadAsStringAsync();
-            try
-            {
-                Assert.Equal("Content Length", responseText);
-                Assert.Null(response.Headers.TransferEncodingChunked);
-                Assert.Null(response.Headers.ConnectionClose);
-                Assert.Equal("14", GetContentLength(response));
-            }
-            catch (XunitException)
-            {
-                logger.LogWarning(response.ToString());
-                logger.LogWarning(responseText);
-                throw;
-            }
-        }
-
-        private static async Task CheckConnectionCloseAsync(HttpClient client, ILogger logger)
-        {
-            var response = await client.GetAsync("connectionclose");
-            var responseText = await response.Content.ReadAsStringAsync();
-            try
-            {
-                Assert.Equal("Connnection Close", responseText);
-                Assert.True(response.Headers.ConnectionClose, "/connectionclose, closed?");
-                Assert.Null(response.Headers.TransferEncodingChunked);
-                Assert.Null(GetContentLength(response));
-            }
-            catch (XunitException)
-            {
-                logger.LogWarning(response.ToString());
-                logger.LogWarning(responseText);
-                throw;
-            }
-        }
-
+        
         private static async Task CheckChunkedAsync(HttpClient client, ILogger logger)
         {
             var response = await client.GetAsync("chunked");
@@ -162,7 +149,7 @@ namespace AspNetCoreModule.FunctionalTests
             }
         }
 
-        private static async Task CheckManuallyChunkedAsync(HttpClient client, ILogger logger)
+        private static async Task CheckChangeNotificationAsync(HttpClient client, ILogger logger)
         {
             var response = await client.GetAsync("manuallychunked");
             var responseText = await response.Content.ReadAsStringAsync();
@@ -180,26 +167,7 @@ namespace AspNetCoreModule.FunctionalTests
                 throw;
             }
         }
-
-        private static async Task CheckManuallyChunkedAndCloseAsync(HttpClient client, ILogger logger)
-        {
-            var response = await client.GetAsync("manuallychunkedandclose");
-            var responseText = await response.Content.ReadAsStringAsync();
-            try
-            {
-                Assert.Equal("Manually Chunked and Close", responseText);
-                Assert.True(response.Headers.TransferEncodingChunked, "/manuallychunkedandclose, chunked?");
-                Assert.True(response.Headers.ConnectionClose, "/manuallychunkedandclose, closed?");
-                Assert.Null(GetContentLength(response));
-            }
-            catch (XunitException)
-            {
-                logger.LogWarning(response.ToString());
-                logger.LogWarning(responseText);
-                throw;
-            }
-        }
-
+        
         private static string GetContentLength(HttpResponseMessage response)
         {
             // Don't use response.Content.Headers.ContentLength, it will dynamically calculate the value if it can.

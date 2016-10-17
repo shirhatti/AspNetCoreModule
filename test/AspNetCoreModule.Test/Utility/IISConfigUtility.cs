@@ -16,7 +16,6 @@ namespace AspNetCoreModule.Test.Utility
         public class Strings
         {
             public static string AppHostConfigPath = Path.Combine(Environment.ExpandEnvironmentVariables("%windir%"), "system32", "inetsrv", "config", "applicationHost.config");
-            
         }
         
         public enum AppPoolSettings
@@ -25,64 +24,9 @@ namespace AspNetCoreModule.Test.Utility
             none
         }
 
-        public string _serverName = null;
-        public string ServerName
+        public void Dispose()
         {
-            get
-            {
-                if (_serverName == null)
-                {
-                    _serverName = "localhost";
-                }
-                return _serverName;
-            }
-            set
-            {
-                _serverName = value;
-            }
-        }
-
-        public string _appPoolName = null;
-        public string AppPoolName
-        {
-            get
-            {
-                if (_appPoolName == null)
-                {
-                    _appPoolName = "DefaultAppPool";
-                }
-                return _appPoolName;
-            }
-            set
-            {
-                _appPoolName = value;
-            }
-        }
-
-        public string _siteName = null;
-        public string SiteName
-        {
-            get
-            {
-                return _siteName;
-            }
-            set
-            {
-                _siteName = value;
-            }
-        }
-
-        public int _tcpPort = 8080;
-        public int TcpPort
-        {
-            get
-            {
-                return _tcpPort;
-            }
-            set
-            {
-                _tcpPort = value;
-            }
+            RestoreAppHostConfig();
         }
 
         public IISConfigUtility(ServerType type)
@@ -90,11 +34,6 @@ namespace AspNetCoreModule.Test.Utility
             this.ServerType = type;
             BackupAppHostConfig();
         }
-        public void Dispose()
-        {
-            RestoreAppHostConfig();
-        }
-        
         public ServerType ServerType = ServerType.IIS;
          
         public ServerManager GetServerManager()
@@ -111,23 +50,60 @@ namespace AspNetCoreModule.Test.Utility
                 );
             }
         }
-
-        public void SetAppPoolSetting(AppPoolSettings attribute, object value)
-        {
-            SetAppPoolSetting(AppPoolName, attribute, value);
-        }
-
-        public void SetAppPoolSetting(string name, AppPoolSettings attribute, object value)
+        
+        public void SetAppPoolSetting(string appPoolName, AppPoolSettings attribute, object value)
         {
             using (ServerManager serverManager = GetServerManager())
             {
                 Configuration config = serverManager.GetApplicationHostConfiguration();
                 ConfigurationSection applicationPoolsSection = config.GetSection("system.applicationHost/applicationPools");
                 ConfigurationElementCollection applicationPoolsCollection = applicationPoolsSection.GetCollection();
-                ConfigurationElement addElement = FindElement(applicationPoolsCollection, "add", "name", name);
+                ConfigurationElement addElement = FindElement(applicationPoolsCollection, "add", "name", appPoolName);
                 if (addElement == null) throw new InvalidOperationException("Element not found!");
                 var attributeName = attribute.ToString();
                 addElement[attributeName] = value;
+                serverManager.CommitChanges();
+            }
+        }
+
+        public void RecycleAppPool(string appPoolName)
+        {
+            using (ServerManager serverManager = GetServerManager())
+            {
+                serverManager.ApplicationPools[appPoolName].Recycle();
+            }
+        }
+
+        public void CreateSite(string siteName, string siteRootPath, int siteId, int tcpPort, string appPoolName = "DefaultAppPool")
+        {
+            using (ServerManager serverManager = GetServerManager())
+            {
+                Configuration config = serverManager.GetApplicationHostConfiguration();
+                ConfigurationSection sitesSection = config.GetSection("system.applicationHost/sites");
+                ConfigurationElementCollection sitesCollection = sitesSection.GetCollection();
+                ConfigurationElement siteElement = sitesCollection.CreateElement("site");
+                siteElement["id"] = siteId;
+                siteElement["name"] = siteName;
+                ConfigurationElementCollection bindingsCollection = siteElement.GetCollection("bindings");
+
+                ConfigurationElement bindingElement = bindingsCollection.CreateElement("binding");
+                bindingElement["protocol"] = @"http";
+                bindingElement["bindingInformation"] = "*:" + tcpPort + ":";
+                bindingsCollection.Add(bindingElement);
+
+                ConfigurationElementCollection siteCollection = siteElement.GetCollection();
+                ConfigurationElement applicationElement = siteCollection.CreateElement("application");
+                applicationElement["path"] = @"/";
+                applicationElement["applicationPool"] = appPoolName;
+
+                ConfigurationElementCollection applicationCollection = applicationElement.GetCollection();
+                ConfigurationElement virtualDirectoryElement = applicationCollection.CreateElement("virtualDirectory");
+                virtualDirectoryElement["path"] = @"/";
+                virtualDirectoryElement["physicalPath"] = siteRootPath;
+                applicationCollection.Add(virtualDirectoryElement);
+                siteCollection.Add(applicationElement);
+                sitesCollection.Add(siteElement);
+
                 serverManager.CommitChanges();
             }
         }
@@ -167,7 +143,7 @@ namespace AspNetCoreModule.Test.Utility
         public void BackupAppHostConfig()
         {
             string fromfile = Strings.AppHostConfigPath;
-            string tofile = Strings.AppHostConfigPath + ".bak";
+            string tofile = Strings.AppHostConfigPath + ".ancmtest.bak";
             if (File.Exists(fromfile))
             {
                 TestUtility.FileCopy(fromfile, tofile, overWrite: false);
@@ -176,7 +152,7 @@ namespace AspNetCoreModule.Test.Utility
 
         public void RestoreAppHostConfig()
         {
-            string fromfile = Strings.AppHostConfigPath + ".bak";
+            string fromfile = Strings.AppHostConfigPath + ".ancmtest.bak";
             string tofile = Strings.AppHostConfigPath;
             if (File.Exists(fromfile))
             {

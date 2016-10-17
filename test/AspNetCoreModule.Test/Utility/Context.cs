@@ -9,10 +9,86 @@ using System.Management;
 
 namespace AspNetCoreModule.Test.Utility
 {
+    public class SiteContext : IDisposable
+    {
+        public SiteContext(string hostName, string siteName, int tcpPort)
+        {
+            _hostName = hostName;
+            _siteName = siteName;
+            _tcpPort = tcpPort;
+        }
+
+        public void Dispose()
+        {
+
+        }
+
+        public string _hostName = null;
+        public string HostName
+        {
+            get
+            {
+                if (_hostName == null)
+                {
+                    _hostName = "localhost";
+                }
+                return _hostName;
+            }
+            set
+            {
+                _hostName = value;
+            }
+        }
+
+        public string _siteName = null;
+        public string SiteName
+        {
+            get
+            {
+                return _siteName;
+            }
+            set
+            {
+                _siteName = value;
+            }
+        }
+
+        public int _tcpPort = 8080;
+        public int TcpPort
+        {
+            get
+            {
+                return _tcpPort;
+            }
+            set
+            {
+                _tcpPort = value;
+            }
+        }
+    }
     public class AppContext : IDisposable
     {
-        public AppContext(string name, string physicalPath, string url = null)
+        private SiteContext _siteContext;
+        public SiteContext SiteContext
         {
+            get
+            {
+                return _siteContext;
+            }
+            set
+            {
+                _siteContext = value;
+            }
+        }
+
+        public AppContext(string name, string physicalPath, string url = null)
+            : this(name, physicalPath, null, url)
+        {
+        }
+                
+        public AppContext(string name, string physicalPath, SiteContext siteContext, string url = null)
+        {
+            _siteContext = siteContext;
             _name = name;
             string temp = physicalPath;
             if (physicalPath.Contains("%"))
@@ -78,7 +154,28 @@ namespace AspNetCoreModule.Test.Utility
             }
         }
 
-        
+        public Uri GetHttpUri()
+        {
+            return new Uri("http:\\" + SiteContext.HostName + URL);
+        }
+
+        public string _appPoolName = null;
+        public string AppPoolName
+        {
+            get
+            {
+                if (_appPoolName == null)
+                {
+                    _appPoolName = "DefaultAppPool";
+                }
+                return _appPoolName;
+            }
+            set
+            {
+                _appPoolName = value;
+            }
+        }
+
         public string GetProcessFileName()
         {
             string filePath = Path.Combine(_physicalPath, "web.config");

@@ -16,15 +16,11 @@ namespace AspNetCoreModule.Test
             var applicationBasePath = PlatformServices.Default.Application.ApplicationBasePath;
             string solutionPath = UseLatestAncm.GetSolutionDirectory();
             string applicationPath = string.Empty;
+            applicationPath = Path.Combine(solutionPath, "test", "AspNetCoreModule.TestSites");
             if (applicationType == ApplicationType.Standalone)
             {
-                applicationPath = Path.Combine(solutionPath, "test", "AspNetCoreModule.TestSites.Standalone");
+                // NA
             }
-            else
-            {
-                applicationPath = Path.Combine(solutionPath, "test", "AspNetCoreModule.TestSites");
-            }
-            var projectName = applicationType == ApplicationType.Standalone ? "ServerComparison.TestSites.Standalone" : "ServerComparison.TestSites";
             return applicationPath;
         }
 

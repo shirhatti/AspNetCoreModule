@@ -140,10 +140,10 @@ namespace AspNetCoreModule.Test.Utility
             return result;
         }
 
-        public static string GetHttpUri(string Url, IISConfigUtility config)
+        public static string GetHttpUri(string Url, SiteContext siteContext)
         {
             string tempUrl = Url.TrimStart(new char[] { '/' });
-            return "http://" + config.ServerName + ":" + config.TcpPort + "/" + tempUrl;
+            return "http://" + siteContext.HostName + ":" + siteContext.TcpPort + "/" + tempUrl;
         }
 
         public static string XmlParser(string xmlFileContent, string elementName, string attributeName, string childkeyValue)
