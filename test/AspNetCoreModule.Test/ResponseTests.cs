@@ -15,6 +15,7 @@ using Xunit.Sdk;
 using AspNetCoreModule.Test;
 using AspNetCoreModule.Test.Utility;
 using static AspNetCoreModule.Test.Utility.IISConfigUtility;
+using System.IO;
 
 namespace AspNetCoreModule.FunctionalTests
 {
@@ -106,21 +107,28 @@ namespace AspNetCoreModule.FunctionalTests
                 {
                     using (var iisConfig = new IISConfigUtility(serverType))
                     {
-                        string standardSiteName = "ancmStandardTestSite";
-                        var testsiteContext = new SiteContext("localhost", standardSiteName, 1234);
-                        var rootAppContext = new AppContext("/", publishedApplicationRootPath, testsiteContext);
-                        iisConfig.CreateSite(testsiteContext.SiteName, rootAppContext.PhysicalPath, 555, testsiteContext.TcpPort, rootAppContext.AppPoolName);
-            
+                        iisConfig.EnableUrlRewriteToIIS();
+
+                        var testsiteContext = new SiteContext("localhost", "StandardTestSite", 1234);
+                        string solutionPath = UseLatestAncm.GetSolutionDirectory();
+                        string webRootPath = Path.Combine(solutionPath, "test", "WebRoot");
+
+                        var rootApp = new AppContext("/", webRootPath, testsiteContext);
+                        iisConfig.CreateSite(testsiteContext.SiteName, rootApp.PhysicalPath, 555, testsiteContext.TcpPort, rootApp.AppPoolName);
+
                         if (appPoolSetting == AppPoolSettings.enable32BitAppOnWin64)
                         {
-                            iisConfig.SetAppPoolSetting(rootAppContext.AppPoolName, AppPoolSettings.enable32BitAppOnWin64, true);
-                            iisConfig.RecycleAppPool(rootAppContext.AppPoolName);
+                            iisConfig.SetAppPoolSetting(rootApp.AppPoolName, AppPoolSettings.enable32BitAppOnWin64, true);
+                            iisConfig.RecycleAppPool(rootApp.AppPoolName);
                         }
+
+                        var fooApp = new AppContext("/foo", publishedApplicationRootPath, testsiteContext);
+                        iisConfig.CreateApp(testsiteContext.SiteName, fooApp.Name, fooApp.PhysicalPath);
                         
                         var httpClientHandler = new HttpClientHandler();
                         var httpClient = new HttpClient(httpClientHandler)
                         {
-                            BaseAddress = rootAppContext.GetHttpUri(),
+                            BaseAddress = fooApp.GetHttpUri(),
                             Timeout = TimeSpan.FromSeconds(5),
                         };
 
@@ -129,7 +137,7 @@ namespace AspNetCoreModule.FunctionalTests
                 }
             }
         }
-        
+
         private static async Task CheckChunkedAsync(HttpClient client, ILogger logger)
         {
             var response = await client.GetAsync("chunked");

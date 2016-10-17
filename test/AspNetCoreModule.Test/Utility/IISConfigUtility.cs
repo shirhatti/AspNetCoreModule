@@ -16,8 +16,12 @@ namespace AspNetCoreModule.Test.Utility
         public class Strings
         {
             public static string AppHostConfigPath = Path.Combine(Environment.ExpandEnvironmentVariables("%windir%"), "system32", "inetsrv", "config", "applicationHost.config");
+            public static string IIS64BitPath = Path.Combine(Environment.ExpandEnvironmentVariables("%windir%"), "system32", "inetsrv");
+            public static string IIS32BitPath = Path.Combine(Environment.ExpandEnvironmentVariables("%windir%"), "syswow64", "inetsrv");
+            public static string IISExpress64BitPath = Path.Combine(Environment.ExpandEnvironmentVariables("%ProgramFiles%"), "IIS Express");
+            public static string IISExpress32BitPath = Path.Combine(Environment.ExpandEnvironmentVariables("%ProgramFiles (x86)%"), "IIS Express");
         }
-        
+
         public enum AppPoolSettings
         {
             enable32BitAppOnWin64,
@@ -74,7 +78,7 @@ namespace AspNetCoreModule.Test.Utility
             }
         }
 
-        public void CreateSite(string siteName, string siteRootPath, int siteId, int tcpPort, string appPoolName = "DefaultAppPool")
+        public void CreateSite(string siteName, string physicalPath, int siteId, int tcpPort, string appPoolName = "DefaultAppPool")
         {
             using (ServerManager serverManager = GetServerManager())
             {
@@ -99,12 +103,94 @@ namespace AspNetCoreModule.Test.Utility
                 ConfigurationElementCollection applicationCollection = applicationElement.GetCollection();
                 ConfigurationElement virtualDirectoryElement = applicationCollection.CreateElement("virtualDirectory");
                 virtualDirectoryElement["path"] = @"/";
-                virtualDirectoryElement["physicalPath"] = siteRootPath;
+                virtualDirectoryElement["physicalPath"] = physicalPath;
                 applicationCollection.Add(virtualDirectoryElement);
                 siteCollection.Add(applicationElement);
                 sitesCollection.Add(siteElement);
 
                 serverManager.CommitChanges();
+            }
+        }
+
+        public void CreateApp(string siteName, string appName, string physicalPath)
+        {
+            using (ServerManager serverManager = GetServerManager())
+            {
+                Configuration config = serverManager.GetApplicationHostConfiguration();
+
+                ConfigurationSection sitesSection = config.GetSection("system.applicationHost/sites");
+
+                ConfigurationElementCollection sitesCollection = sitesSection.GetCollection();
+
+                ConfigurationElement siteElement = FindElement(sitesCollection, "site", "name", siteName);
+                if (siteElement == null) throw new InvalidOperationException("Element not found!");
+
+                ConfigurationElementCollection siteCollection = siteElement.GetCollection();
+
+                ConfigurationElement applicationElement = siteCollection.CreateElement("application");
+                applicationElement["path"] = @"/" + appName;
+
+                ConfigurationElementCollection applicationCollection = applicationElement.GetCollection();
+
+                ConfigurationElement virtualDirectoryElement = applicationCollection.CreateElement("virtualDirectory");
+                virtualDirectoryElement["path"] = @"/";
+                virtualDirectoryElement["physicalPath"] = physicalPath;
+                applicationCollection.Add(virtualDirectoryElement);
+                siteCollection.Add(applicationElement);
+
+                serverManager.CommitChanges();
+            }
+        }
+
+        public void EnableUrlRewriteToIIS()
+        {
+            var fromRewrite64 = Path.Combine(Strings.IISExpress64BitPath, "rewrite.dll");
+            var fromRewrite32 = Path.Combine(Strings.IISExpress64BitPath, "rewrite.dll");
+            var toRewrite64 = Path.Combine(Strings.IIS64BitPath, "rewrite.dll");
+            var toRewrite32 = Path.Combine(Strings.IIS32BitPath, "rewrite.dll");
+            if (!File.Exists(toRewrite64))
+            {
+                if (File.Exists(fromRewrite64))
+                {
+                    File.Copy(fromRewrite64, toRewrite64);
+                }
+            }
+            if (!File.Exists(toRewrite32))
+            {
+                if (File.Exists(fromRewrite32))
+                {
+                    File.Copy(fromRewrite32, toRewrite32);
+                }
+            }
+
+            using (ServerManager serverManager = GetServerManager())
+            {
+                bool commitChange = false;
+                Configuration config = serverManager.GetApplicationHostConfiguration();
+                ConfigurationSection globalModulesSection = config.GetSection("system.webServer/globalModules");
+                ConfigurationElementCollection globalModulesCollection = globalModulesSection.GetCollection();
+                if (globalModulesCollection["RewriteModule"] == null)
+                {
+                    ConfigurationElement addElement = globalModulesCollection.CreateElement("add");
+                    addElement["name"] = @"RewriteModule";
+                    addElement["image"] = @"%windir%\system32\inetsrv\rewrite.dll";
+                    globalModulesCollection.Add(addElement);
+                    commitChange = true;
+                }
+
+                ConfigurationSection modulesSection = config.GetSection("system.webServer/modules");
+                ConfigurationElementCollection modulesCollection = modulesSection.GetCollection();
+                if (modulesCollection["RewriteModule"] == null)
+                {
+                    ConfigurationElement addElement = modulesCollection.CreateElement("add");
+                    addElement["name"] = @"RewriteModule";
+                    modulesCollection.Add(addElement);
+                    commitChange = true;
+                }
+                if (commitChange)
+                {
+                    serverManager.CommitChanges();
+                }
             }
         }
 
