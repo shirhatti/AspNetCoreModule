@@ -5,6 +5,8 @@ using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
 using Microsoft.Net.Http.Headers;
+using System;
+using System.Threading;
 
 namespace AspnetCoreModule.TestSites
 {
@@ -63,7 +65,15 @@ namespace AspnetCoreModule.TestSites
 
             app.Run(context =>
             {
-                return context.Response.WriteAsync("Running");
+                string response = "Running";
+                var testSleep = context.Request.Headers["test-sleep"];
+                if (testSleep.ToString() != string.Empty)
+                {
+                    int sleepTime = Convert.ToInt32(testSleep.ToString());
+                    Thread.Sleep(sleepTime);
+                    response += ("; test-sleep: " + testSleep.ToString());
+                }
+                return context.Response.WriteAsync(response);
             });
         }
     }

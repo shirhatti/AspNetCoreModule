@@ -19,6 +19,20 @@ namespace AspNetCoreModule.Test.WebSocketClient
         public byte[] Data { get; private set; }
         public string Content { get; private set; }
         public bool IsMasked { get; private set; }
+        public int IndexOfNextFrame
+        {
+            get
+            {
+                if (Content.Length > 0 && Data.Length > Content.Length + 2)
+                {
+                    return Content.Length + 2;
+                }
+                else
+                {
+                    return -1;
+                }
+            }
+        }
 
         override public string ToString()
         {

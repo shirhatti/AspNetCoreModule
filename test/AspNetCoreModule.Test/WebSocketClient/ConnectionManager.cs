@@ -123,7 +123,7 @@ namespace AspNetCoreModule.Test.WebSocketClient
                         tempBuffer = WebSocketClientUtility.SubArray(Client.InputData, 0, bytesRead);
                         InputDataArray.Add(tempBuffer);
                         bytesReadIntotal += bytesRead;
-                        TestUtility.LogVerbose("Looping: Client {0:D3}: bytesReadHere {1} ", Client.Id, bytesRead);
+                        TestUtility.LogVerbose("ReadDataCallback: Looping: Client {0:D3}: bytesReadHere {1} ", Client.Id, bytesRead);
                     }
 
                     // create a single byte array with the arrayList
@@ -141,8 +141,23 @@ namespace AspNetCoreModule.Test.WebSocketClient
                 
                 // Create frame with the tempBuffer
                 Frame frame = new Frame(tempBuffer);
-                TestUtility.LogVerbose("Client {0:D3}: Read Type {1} : {2} ", Client.Id, frame.FrameType, bytesReadIntotal);
-                ProcessReceivedData(frame);
+                int nextFrameIndex = 0;
+                while (nextFrameIndex != -1)
+                {
+                    TestUtility.LogVerbose("ReadDataCallback: Client {0:D3}: Read Type {1} : {2} ", Client.Id, frame.FrameType, bytesReadIntotal);
+                    ProcessReceivedData(frame);
+
+                    // Send Pong if the frame was Ping
+                    if (frame.FrameType == FrameType.Ping)
+                        SendPong(frame);
+
+                    nextFrameIndex = frame.IndexOfNextFrame;
+                    if (nextFrameIndex != -1)
+                    {
+                        tempBuffer = tempBuffer.SubArray(frame.IndexOfNextFrame, tempBuffer.Length - frame.IndexOfNextFrame);
+                        frame = new Frame(tempBuffer);
+                    }
+                }
 
                 // Send Pong if the frame was Ping
                 if (frame.FrameType == FrameType.Ping)
